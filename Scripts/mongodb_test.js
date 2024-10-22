@@ -20,6 +20,7 @@ var doc1 = {
 // CRUD
 db.operation.insertOne(doc1);
 
+db.operation.find();
 db.operation.findOne({n: 1});
 
 db.operation.updateOne({n: 1}, {$inc: {v: 1}});
@@ -34,6 +35,7 @@ db.operation.createIndex({"trs.ac": 1, "cr": 1});
 
 // Генератор тестовых данных
 generateOperation(100);
+db.operation.find().count();
 
 // Выборка по счету 1
 db.operation.find({"trs.ac": 1});
@@ -52,7 +54,7 @@ db.operation.aggregate(
 db.operation.aggregate(
     [
         {$unwind: "$trs"},
-        {$group: {_id: 1, balance: {$sum: "$trs.am"}}}
+        {$group: {_id: 0, balance: {$sum: "$trs.am"}}}
     ]
 );
 
@@ -165,8 +167,10 @@ ConsistencyTestGenerator({ w: 3, j: true}, "majority", 1024*1024*1, 10)
 
 // "linearizable" - чтение ожидает завершения репликации на majority число узлов, растет длительность чтения данных
 ConsistencyTestGenerator({ w: 1, j: false}, "majority", 1024*1024*1, 10); // для сравнения, читаем старые данные
-ConsistencyTestGenerator({ w: 1, j: false}, "linearizable", 1024*1024*1, 10); // читаем новые данные get_time большое
-ConsistencyTestGenerator({ w: 2, j: false}, "linearizable", 1024*1024*1, 10); // читаем новые данные get_time не большое
+// читаем новые данные get_time большое, duration небольшое
+ConsistencyTestGenerator({ w: 1, j: false}, "linearizable", 1024*1024*1, 10); 
+// читаем новые данные get_time не большое, а duration большое
+ConsistencyTestGenerator({ w: 3, j: true}, "linearizable", 1024*1024*1, 10); 
 
 // Размер транзакции не более 16 Мбайт
 ConsistencyTestGenerator({ w: 1, j: false}, "majority", 1024*1024*2, 10)

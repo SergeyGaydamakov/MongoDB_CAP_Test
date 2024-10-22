@@ -141,12 +141,15 @@ function ConsistencyTestGenerator(writeConcern, readConcern, blockSize, count){
     var secondaryMongo2 = new Mongo("mongodb://localhost:29003/?directConnection=true");
     var secondaryDb2 = secondaryMongo2.getDB("test");
 
+    var waitInterval = new Date().getTime() + 500;
+    while (waitInterval > new Date().getTime()){};
+
     // Выполнение теста
     print(` ${"start tr  -  end tran =  duration".padEnd(33," ")} ? ${"primary".padStart(7," ")} ${"second1".padStart(7," ")} ${"second2".padStart(7," ")} ${"replset".padStart(7," ")} get_time`);
     for (var i=1; i < 10; i++){
-        var waitInterval = new Date().getTime() + 500;
+        var waitInterval = new Date().getTime() + 100;
         while (waitInterval > new Date().getTime()){};
-        // Обновление документа в транзакции 10 раз 
+            // Обновление документа в транзакции 10 раз 
         primarySession.startTransaction( { readConcern: { level: "local" }, writeConcern: writeConcern } );
         for (var j=0; j < count; j++){
             primaryDb.consistency_test.updateOne( {"n": 1}, {"$inc": {"v": 1}, "$set": {"s": (j % 2 ? longString1 : longString2)}}, {writeConcern: writeConcern});
@@ -334,95 +337,6 @@ function ConsistencyTestObserver(readConcern){
         previousStamp = stamp;
     }
 }
-
-/*
-function ConsistencyTestObserver_old(readConcern, timeMin){
-    function GetDatabaseConnect( connectionString, existsDb){
-        if (existsDb){
-            return existsDb;
-        }
-        var newDb = null;
-        try {
-            var mongoConnect = new Mongo(connectionString);
-            newDb = mongoConnect.getDB("test");
-        } catch(error){
-            // nothing
-        }
-        return newDb;
-    }
-    function GetDataCollection(dbConnect, readConcern, readPreference, wtimeout ){
-        if (!dbConnect){
-            return null;
-        }
-        var data = null;
-        try {
-            data = dbConnect.consistency_test.findOne({"n": 1}, {"_id": 0, "v": 1}, {readConcern: readConcern, readPreference: readPreference, wtimeout: wtimeout});
-        } catch(error){
-            // nothing
-        }
-        return data;
-    }
-    // Подготовка теста
-    var primaryDb = null;
-    var secondaryDb1 = null;
-    var secondaryDb2 = null;
-    var rsDb = null;
-    var stopTime = new Date().getTime() + timeMin * 60 * 1000;
-    var i = 0;
-    // Окно несогласованности (inconsistency window)
-    // Получение данных
-    var nowTime = new Date();
-    var previousIsOk = true;
-    var previousStamp = "";
-    var startInconsistencyTime = new Date();
-    var endInconsistencyTime = new Date();
-    var header = ` ${"  time  ".padEnd(9," ")} ? ${" 29001 ".padStart(7," ")} ${" 29002 ".padStart(7," ")} ${" 29003 ".padStart(7," ")} ${"replset".padStart(7," ")}`;
-    print(header);
-    while ( nowTime.getTime() < stopTime){
-        primaryDb = GetDatabaseConnect("mongodb://localhost:29001/?directConnection=true", primaryDb);
-        secondaryDb1 = GetDatabaseConnect("mongodb://localhost:29002/?directConnection=true", secondaryDb1);
-        secondaryDb2 = GetDatabaseConnect("mongodb://localhost:29003/?directConnection=true", secondaryDb2);
-        rsDb = GetDatabaseConnect("mongodb://localhost:29001/?replicaSet=rs", rsDb);
-        if (!rsDb){
-            rsDb = GetDatabaseConnect("mongodb://localhost:29002/?replicaSet=rs", rsDb);
-        }
-        if (!rsDb){
-            rsDb = GetDatabaseConnect("mongodb://localhost:29003/?replicaSet=rs", rsDb);
-        }
-        var primaryData = GetDataCollection(primaryDb, "local", "primary", 100);
-        var secondaryData1 = GetDataCollection(secondaryDb1, "local", "secondary", 100);
-        var secondaryData2 = GetDataCollection(secondaryDb2, "local", "secondary", 100);
-        var rsData = GetDataCollection(rsDb, readConcern, "primary", 300);
-
-        var primaryV = (primaryData ? primaryData.v : 0);
-        var secondaryV1 = (secondaryData1 ? secondaryData1.v : 0);
-        var secondaryV2 = (secondaryData2 ? secondaryData2.v : 0);
-        var rsDataV = (rsData ? rsData.v : 0);
-        var isOk = (primaryV == secondaryV1) && (primaryV == secondaryV2) && (primaryV == rsDataV);
-        if (!previousIsOk && isOk){
-            endInconsistencyTime = nowTime;
-            print(`Окно несогласованности (inconsistency window): ${(endInconsistencyTime.getTime()-startInconsistencyTime.getTime()).toString().padStart(6)} мсек`);
-            print("");
-            print(header);
-        }
-        if (previousIsOk && !isOk){
-            startInconsistencyTime = nowTime;
-        }
-        secondaryV1 = (primaryV == secondaryV1 ? secondaryV1 : -secondaryV1);
-        secondaryV2 = (primaryV == secondaryV2 ? secondaryV2 : -secondaryV2);
-        rsDataV = (primaryV == rsDataV ? rsDataV : -rsDataV);
-        var stamp = `${primaryV}-${secondaryV1}-${secondaryV2}-${rsDataV}`;
-        var frequency = (primaryData && secondaryData1 && secondaryData2 && rsDataV ? 500 : 100);
-        if (previousStamp != stamp || !(i % frequency)) {
-            print(` ${nowTime.toLocaleTimeString([], {minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3})} ${(isOk ? "+" : "!")} ${primaryV.toString().padStart(7)} ${secondaryV1.toString().padStart(7)} ${secondaryV2.toString().padStart(7)} ${rsDataV.toString().padStart(7)}`);
-        }
-        i++;
-        nowTime = new Date();
-        previousIsOk = isOk;
-        previousStamp = stamp;
-    }
-}
-*/
 
 (function(){
 	
