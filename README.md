@@ -14,3 +14,5 @@ Replica set состоит из 3 узлов mongod:
 3. Запустите 3 узла Mongodb командным файлом **rs_1_start.bat**
 4. Создайте Replica set командным файлом **rs_5_build.bat**
 5. Подключитесь к Replica set командным файлом **rs_3_connect.bat**
+
+Функции для тестирования свойств MongoDB находятся в файле **mongodb_test.js**
