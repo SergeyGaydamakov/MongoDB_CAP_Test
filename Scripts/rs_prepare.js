@@ -141,13 +141,10 @@ function ConsistencyTestGenerator(writeConcern, readConcern, blockSize, count){
     var secondaryMongo2 = new Mongo("mongodb://localhost:29003/?directConnection=true");
     var secondaryDb2 = secondaryMongo2.getDB("test");
 
-    var waitInterval = new Date().getTime() + 500;
-    while (waitInterval > new Date().getTime()){};
-
     // Выполнение теста
     print(` ${"start tr  -  end tran =  duration".padEnd(33," ")} ? ${"primary".padStart(7," ")} ${"second1".padStart(7," ")} ${"second2".padStart(7," ")} ${"replset".padStart(7," ")} get_time`);
     for (var i=1; i < 10; i++){
-        var waitInterval = new Date().getTime() + 100;
+        var waitInterval = new Date().getTime() + 1000;
         while (waitInterval > new Date().getTime()){};
             // Обновление документа в транзакции 10 раз 
         primarySession.startTransaction( { readConcern: { level: "local" }, writeConcern: writeConcern } );
@@ -234,12 +231,12 @@ function ConsistencyTestObserver(readConcern){
         return nodes;
     }
     function GetPrintHeader(nodes){
-        return ` ${"  time  ".padEnd(9," ")} ${"duration"}  ? ${nodes.map(n => n.name.padStart(7," ")).join(" ")} ${"Primary".padEnd(15)}`;
+        return `  # ${"  time  ".padEnd(9," ")} ${"duration"}  ? ${nodes.map(n => n.name.padStart(7," ")).join(" ")} ${"Primary".padEnd(15)}`;
     }
-    function GetPrintValues(nodes, nowTime, getDuration, isOk){
+    function GetPrintValues(nodes, step, nowTime, getDuration, isOk){
         var rsNode = nodes.find(n => n.isReplicaset);
         var etalonValue = (rsNode ? rsNode.value : null);
-        return ` ${nowTime.toLocaleTimeString([], {minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3})} ${getDuration.toString().padStart(5)} ms  ${(isOk ? "+" : "!")} ${nodes.map(n => (!n.value ? "-" : (n.value == etalonValue ? n.value : -n.value).toString()).padStart(7)).join(" ")} ${(rsNode && rsNode.rsName ? rsNode.rsName : "   -").padEnd(15)}`;
+        return ` ${("0"+step).slice(-2)} ${nowTime.toLocaleTimeString([], {minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3})} ${getDuration.toString().padStart(5)} ms  ${(isOk ? "+" : "!")} ${nodes.map(n => (!n.value ? "-" : (n.value == etalonValue ? n.value : -n.value).toString()).padStart(7)).join(" ")} ${(rsNode && rsNode.rsName ? rsNode.rsName : "   -").padEnd(15)}`;
     }
     // Подготовка теста
     var NODES = [
@@ -308,23 +305,31 @@ function ConsistencyTestObserver(readConcern){
     var endInconsistencyTime = new Date();
     var lastPrint = new Date();
     print( GetPrintHeader(NODES) );
+    var step = 0;
     while ( true ){
         var nowTime = new Date();
         GetDataForNodes(NODES);
         var getDuration = new Date().getTime() - nowTime.getTime();
         var isOk = rsNODE.data && !NODES.some(n => !n.data || n.value != rsNODE.value );
-        var stamp = NODES.map(n => n.value).join("-");
+        var stamp = NODES.map(n => (n.value ? n.value : "0")).join("-");
         if (previousStamp != stamp || (lastPrint.getTime() < nowTime.getTime() - 5 * 1000)) {
-            print( GetPrintValues(NODES, nowTime, getDuration, isOk) );
+            step++;
+            print( GetPrintValues(NODES, step, nowTime, getDuration, isOk) );
             lastPrint = nowTime;
         }
         if (!previousIsOk && isOk){
             endInconsistencyTime = nowTime;
             var inconsistencyWindow = endInconsistencyTime.getTime()-startInconsistencyTime.getTime();
             print(`Окно несогласованности (inconsistency window): ${inconsistencyWindow} мсек`);
-            totalMeasurements++;
-            totalInconsistencyWindow += inconsistencyWindow;
-            print(`Окно несогласованности в среднем: ${(totalInconsistencyWindow / totalMeasurements).toFixed()} мсек`);
+            var hasData = NODES.every(n => n.value > 0);
+            if (hasData) {
+                totalMeasurements++;
+                totalInconsistencyWindow += inconsistencyWindow;
+                print(`Окно несогласованности в среднем: ${(totalMeasurements ? (totalInconsistencyWindow / totalMeasurements).toFixed() : 0)} мсек`);
+            } else {
+                totalMeasurements = 0;
+                totalInconsistencyWindow = 0;
+            }
             print("");
             print(`readConcern: ${readConcern} `);
             print( GetPrintHeader(NODES) );
